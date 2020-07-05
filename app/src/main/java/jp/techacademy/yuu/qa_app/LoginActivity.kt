@@ -20,7 +20,7 @@ import kotlinx.android.synthetic.main.activity_login.*
 
 import java.util.HashMap
 
-class LoginActivity : AppCompatActivity() {
+class   LoginActivity : AppCompatActivity() {
 
     private lateinit var mAuth: FirebaseAuth
     private lateinit var mCreateAccountListener: OnCompleteListener<AuthResult>
