@@ -7,6 +7,6 @@ class Question (val title:String,val body:String,val name:String,val uid:String,
     val imageBytes:ByteArray
 
     init {
-    imageBytes = byte.clone()
+    imageBytes = bytes.clone()
     }
 }
