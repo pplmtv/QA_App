@@ -26,6 +26,7 @@
         android:textAppearance="?android:attr/textAppearanceSmall"
         android:text="name"
         android:id="@+id/nameTextView"
+        android:layout_below="@+id/titleTextView"
         android:layout_alignParentRight="true"
         android:layout_marginRight="10dp"/>
 

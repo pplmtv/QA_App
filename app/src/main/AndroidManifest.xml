@@ -23,9 +23,9 @@
             </intent-filter>
         </activity>
         <activity android:name=".LoginActivity"/>
-        <activity android:name=".SettingAcitvity">
+        <activity android:name=".SettingActivity">
         </activity>
-        <activity android:name=".QuestionSendAcitivity">
+        <activity android:name=".QuestionSendActivity">
         </activity>
     </application>
 
