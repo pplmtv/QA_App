@@ -14,95 +14,185 @@ import android.view.MenuItem
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import android.support.design.widget.Snackbar
+import android.util.Base64
+import android.widget.ListView
+import com.google.firebase.database.*
 
 class MainActivity : AppCompatActivity(),NavigationView.OnNavigationItemSelectedListener {
 
     private lateinit var mToolbar: Toolbar
     private var mGenre = 0
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-        mToolbar = findViewById(R.id.toolbar)
-        setSupportActionBar(mToolbar)
+    private lateinit var mDatabaseReference: DatabaseReference
+    private lateinit var mListView: ListView
+    private lateinit var mQuestionArrayList: ArrayList<Question>
+    private lateinit var mAdapter: QuestionsListAdapter
 
-        val fab = findViewById<FloatingActionButton>(R.id.fab)
-        fab.setOnClickListener { view ->
-            // ジャンルを選択していない場合(mGenre == 0)はエラーを表示するだけ
+    private var mGenreRef: DatabaseReference? = null
+
+    private val mEventsListener = object : ChildEventListener {
+        override fun onChildAdded(dataSnapshot: DataSnapshot, s: String?) {
+            val map = dataSnapshot.value as Map<String, String>
+            val title = map["title"] ?: ""
+            val body = map["body"] ?: ""
+            val name = map["name"] ?: ""
+            val uid = map["uid"] ?: ""
+            val imageString = map["image"] ?: ""
+            val bytes =
+                if (imageString.isNotEmpty()) {
+                    Base64.decode(imageString, Base64.DEFAULT)
+                } else {
+                    byteArrayOf()
+                }
+
+            val answerArrayList = ArrayList<Answer>()
+            val answerMap = map["answers"] as Map<String, String>?
+            if (answerMap != null) {
+                for (key in answerMap.keys) {
+                    val temp = answerMap[key] as Map<String, String>
+                    val answerBody = temp["body"] ?: ""
+                    val answerName = temp["name"] ?: ""
+                    val answerUid = temp["uid"] ?: ""
+                    val answer = Answer(answerBody, answerName, answerUid, key)
+                    answerArrayList.add(answer)
+                }
+            }
+
+            val question = Question(
+                title,
+                body,
+                name,
+                uid,
+                dataSnapshot.key ?: "",
+                mGenre,
+                bytes,
+                answerArrayList
+            )
+            mQuestionArrayList.add(question)
+            mAdapter.notifyDataSetChanged()
+        }
+
+        override fun onChildChanged(dataSnapshot: DataSnapshot, s: String?) {
+            val map = dataSnapshot.value as Map<String, String>
+
+            // 変更があったらQuestionを探す
+            for (question in mQuestionArrayList) {
+                if (dataSnapshot.key.equals(question.questionUid)) {
+                    // このアプリで変更がある可能性があるのは回答(Answer)のみ
+                    question.answers.clear()
+                    val answerMap = map["answers"] as Map<String, String>?
+                    if (answerMap != null) {
+                        for (key in answerMap.keys) {
+                            val temp = answerMap[key] as Map<String, String>
+                            val answerBody = temp["body"] ?: ""
+                            val answerName = temp["name"] ?: ""
+                            val answerUid = temp["uid"] ?: ""
+                            val answer = Answer(answerBody, answerName, ansewerUid, key)
+                            question.answers.add(answer)
+                        }
+                    }
+
+                    mAdapter.notifyDataSetChanged()
+                }
+            }
+        }
+
+        override fun onChildRemoved(p0: DataSnapshot) {
+
+        }
+
+        override fun onChildMoved(p0: DataSnapshot, p1: String?) {
+
+        }
+
+        override fun onCancelled(p0: DatabaseError) {
+
+        }
+
+        override fun onCreate(savedInstanceState: Bundle?) {
+            super.onCreate(savedInstanceState)
+            setContentView(R.layout.activity_main)
+            mToolbar = findViewById(R.id.toolbar)
+            setSupportActionBar(mToolbar)
+
+            val fab = findViewById<FloatingActionButton>(R.id.fab)
+            fab.setOnClickListener { view ->
+                // ジャンルを選択していない場合(mGenre == 0)はエラーを表示するだけ
+                if (mGenre == 0) {
+                    Snackbar.make(view, "ジャンルを選択して下さい", Snackbar.LENGTH_LONG).show()
+                } else {
+
+                }
+
+                // ログイン済みのユーザーを取得する
+                val user = FirebaseAuth.getInstance().currentUser
+
+                // ログインしていなければログイン画面に遷移する
+                if (user == null) {
+                    val intent = Intent(applicationContext, LoginActivity::class.java)
+                    startActivity(intent)
+                } else {
+                    // ジャンルを渡して質問画像を起動する
+                    val intent = Intent(applicationContext, QuestionSendActivity::class.java)
+                    intent.putExtra("genre", mGenre)
+                    startActivity(intent)
+                }
+            }
+
+            // ナビゲーションドロワーの設定
+            val drawer = findViewById<DrawerLayout>(R.id.drawer_layout)
+            val toggle =
+                ActionBarDrawerToggle(this, drawer, mToolbar, R.string.app_name, R.string.app_name)
+            drawer.addDrawerListener(toggle)
+            toggle.syncState()
+
+            val navigationView = findViewById<NavigationView>(R.id.nav_view)
+
+            // 1:趣味の規定を選択とする
             if (mGenre == 0) {
-                Snackbar.make(view,"ジャンルを選択して下さい",Snackbar.LENGTH_LONG).show()
-            } else {
-
+                onNavigationItemSelected(navigationView.menu.getItem(0))
             }
 
-            // ログイン済みのユーザーを取得する
-            val user = FirebaseAuth.getInstance().currentUser
-
-            // ログインしていなければログイン画面に遷移する
-            if (user == null) {
-                val intent = Intent(applicationContext, LoginActivity::class.java)
-                startActivity(intent)
-            } else {
-                // ジャンルを渡して質問画像を起動する
-                val intent = Intent(applicationContext,QuestionSendActivity::class.java)
-                intent.putExtra("genre",mGenre)
-                startActivity(intent)
-            }
         }
 
-        // ナビゲーションドロワーの設定
-        val drawer = findViewById<DrawerLayout>(R.id.drawer_layout)
-        val toggle =
-            ActionBarDrawerToggle(this, drawer, mToolbar, R.string.app_name, R.string.app_name)
-        drawer.addDrawerListener(toggle)
-        toggle.syncState()
-
-        val navigationView = findViewById<NavigationView>(R.id.nav_view)
-
-        // 1:趣味の規定を選択とする
-        if(mGenre == 0) {
-            onNavigationItemSelected(navigationView.menu.getItem(0))
-        }
-
-    }
-
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        // Inflate the menu; this adds items to the action bar if it is present.
-        menuInflater.inflate(R.menu.menu_main, menu)
-        return true
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-
-        val id = item.itemId
-
-        if (id == R.id.action_settings){
-            val intent = Intent(applicationContext,SettingActivity::class.java)
-            startActivity(intent)
+        override fun onCreateOptionsMenu(menu: Menu): Boolean {
+            // Inflate the menu; this adds items to the action bar if it is present.
+            menuInflater.inflate(R.menu.menu_main, menu)
             return true
         }
 
-        return super.onOptionsItemSelected(item)
-    }
+        override fun onOptionsItemSelected(item: MenuItem): Boolean {
 
-    override fun onNavigationItemSelected(item: MenuItem): Boolean {
-        val id = item.itemId
+            val id = item.itemId
 
-        if (id == R.id.nav_hobby){
-            mToolbar.title = "趣味"
-            mGenre = 1
-        } else if (id == R.id.nav_life){
-            mToolbar.title = "生活"
-            mGenre = 2
-        } else if (id == R.id.nav_health){
-            mToolbar.title = "健康"
-        } else if (id == R.id.nav_computer){
-            mToolbar.title = "コンピューター"
-            mGenre = 4
+            if (id == R.id.action_settings) {
+                val intent = Intent(applicationContext, SettingActivity::class.java)
+                startActivity(intent)
+                return true
+            }
+
+            return super.onOptionsItemSelected(item)
         }
 
-        val drawer = findViewById<DrawerLayout>(R.id.drawer_layout)
-        drawer.closeDrawer(GravityCompat.START)
-        return true
+        override fun onNavigationItemSelected(item: MenuItem): Boolean {
+            val id = item.itemId
+
+            if (id == R.id.nav_hobby) {
+                mToolbar.title = "趣味"
+                mGenre = 1
+            } else if (id == R.id.nav_life) {
+                mToolbar.title = "生活"
+                mGenre = 2
+            } else if (id == R.id.nav_health) {
+                mToolbar.title = "健康"
+            } else if (id == R.id.nav_computer) {
+                mToolbar.title = "コンピューター"
+                mGenre = 4
+            }
+
+            val drawer = findViewById<DrawerLayout>(R.id.drawer_layout)
+            drawer.closeDrawer(GravityCompat.START)
+            return true
+        }
     }
 }
